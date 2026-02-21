@@ -23,8 +23,13 @@ export type ProjectMember = {
   project_id: string;
   user_id: string;
   role: Role;
+  active: boolean;
   created_at: string;
   project?: Project;
+};
+
+export type ProjectMemberWithProfile = ProjectMember & {
+  profile: Pick<Profile, 'full_name'> | null;
 };
 
 export type ProjectInvite = {

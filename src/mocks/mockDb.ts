@@ -39,6 +39,7 @@ export const mockMembers: ProjectMember[] = mockProjects.map((project) => ({
   project_id: project.id,
   user_id: mockUser.id,
   role: 'owner',
+  active: true,
   created_at: now(),
   project,
 }));
@@ -49,6 +50,7 @@ export const mockViewerMembers: ProjectMember[] = [
     project_id: mockProjects[0].id,
     user_id: mockViewer.id,
     role: 'viewer',
+    active: true,
     created_at: now(),
     project: mockProjects[0],
   },
