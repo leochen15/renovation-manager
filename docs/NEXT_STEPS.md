@@ -9,9 +9,8 @@ This document lists the required setup steps and configuration values for deploy
   - `SUPABASE_ANON_KEY`
 
 ## 2. Database Schema + RLS
-- Create tables exactly as defined in `MVP_PLAN.md`.
-- Enable Row-Level Security (RLS) on all tables.
-- Add the policies listed in `MVP_PLAN.md`.
+- Run the SQL in `docs/SUPABASE_SCHEMA.sql`.
+- Confirm Row-Level Security (RLS) is enabled on all tables.
 
 ## 3. Auth Configuration
 - Enable Email/Password login.
