@@ -14,6 +14,8 @@ type Props = {
   type?: string;
   onSubmitEditing?: TextInputProps['onSubmitEditing'];
   returnKeyType?: TextInputProps['returnKeyType'];
+  onFocus?: TextInputProps['onFocus'];
+  onBlur?: TextInputProps['onBlur'];
 };
 
 export const Input = ({
@@ -28,6 +30,8 @@ export const Input = ({
   type,
   onSubmitEditing,
   returnKeyType,
+  onFocus,
+  onBlur,
 }: Props) => {
   return (
     <View style={styles.container}>
@@ -44,6 +48,8 @@ export const Input = ({
         inputMode={inputMode}
         onSubmitEditing={onSubmitEditing}
         returnKeyType={returnKeyType}
+        onFocus={onFocus}
+        onBlur={onBlur}
         // @ts-expect-error web-only input type support
         type={type}
       />

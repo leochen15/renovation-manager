@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -41,6 +41,8 @@ export const BudgetScreen = () => {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<BudgetStatus[]>([]);
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const categoryBlurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const projectId = selectedProject?.id;
 
@@ -63,6 +65,34 @@ export const BudgetScreen = () => {
     () => [...new Set((items ?? []).map((i) => i.category).filter(Boolean))] as string[],
     [items]
   );
+
+  const categorySuggestions = useMemo(() => {
+    if (!category.trim()) return categories;
+    const q = category.trim().toLowerCase();
+    return categories.filter((c) => c.toLowerCase().includes(q));
+  }, [categories, category]);
+
+  const openCategoryDropdown = () => {
+    if (categoryBlurTimeoutRef.current) {
+      clearTimeout(categoryBlurTimeoutRef.current);
+      categoryBlurTimeoutRef.current = null;
+    }
+    setCategoryDropdownOpen(true);
+  };
+
+  const closeCategoryDropdown = () => {
+    if (categoryBlurTimeoutRef.current) clearTimeout(categoryBlurTimeoutRef.current);
+    categoryBlurTimeoutRef.current = setTimeout(() => setCategoryDropdownOpen(false), 200);
+  };
+
+  const selectCategory = (cat: string) => {
+    setCategory(cat);
+    setCategoryDropdownOpen(false);
+    if (categoryBlurTimeoutRef.current) {
+      clearTimeout(categoryBlurTimeoutRef.current);
+      categoryBlurTimeoutRef.current = null;
+    }
+  };
 
   const filteredItems = useMemo(() => {
     let list = items ?? [];
@@ -229,7 +259,38 @@ export const BudgetScreen = () => {
         <Card>
           <Text style={styles.cardTitle}>New budget item</Text>
           <Input label="Item" value={name} onChangeText={setName} placeholder="Kitchen cabinetry" />
-          <Input label="Category" value={category} onChangeText={setCategory} placeholder="Materials" />
+          <View style={styles.categoryComboboxWrap}>
+            <Input
+              label="Category"
+              value={category}
+              onChangeText={setCategory}
+              placeholder="Select or type category..."
+              onFocus={openCategoryDropdown}
+              onBlur={closeCategoryDropdown}
+            />
+            {categoryDropdownOpen ? (
+              <View style={styles.categoryDropdown}>
+                <ScrollView
+                  style={styles.categoryDropdownScroll}
+                  nestedScrollEnabled
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {categorySuggestions.map((cat) => (
+                    <Pressable
+                      key={cat}
+                      onPress={() => selectCategory(cat)}
+                      style={styles.categoryDropdownItem}
+                    >
+                      <Text style={styles.categoryDropdownItemText}>{cat}</Text>
+                    </Pressable>
+                  ))}
+                  {categorySuggestions.length === 0 ? (
+                    <Text style={styles.categoryDropdownEmpty}>No matching categories</Text>
+                  ) : null}
+                </ScrollView>
+              </View>
+            ) : null}
+          </View>
           <Input label="Estimated cost" value={estimatedCost} onChangeText={setEstimatedCost} keyboardType="numeric" />
           <Input label="Actual cost" value={actualCost} onChangeText={setActualCost} keyboardType="numeric" />
           <View style={styles.statusRow}>
@@ -437,6 +498,41 @@ const styles = StyleSheet.create({
   filterButton: {
     minWidth: 90,
     backgroundColor: '#6C8A7E',
+  },
+  categoryComboboxWrap: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  categoryDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    maxHeight: 160,
+  },
+  categoryDropdownScroll: {
+    maxHeight: 160,
+  },
+  categoryDropdownItem: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  categoryDropdownItemText: {
+    fontSize: typography.body,
+    color: colors.text,
+  },
+  categoryDropdownEmpty: {
+    fontSize: typography.body,
+    color: colors.textMuted,
+    padding: spacing.sm,
   },
   modalOverlay: {
     flex: 1,
