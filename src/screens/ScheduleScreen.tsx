@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Dimensions, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, differenceInCalendarDays, parseISO } from 'date-fns';
 import { supabase } from '../lib/supabase';
@@ -37,8 +37,26 @@ export const ScheduleScreen = () => {
   const [endPickerOpen, setEndPickerOpen] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [endError, setEndError] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [editStatus, setEditStatus] = useState<'planned' | 'in_progress' | 'blocked' | 'done'>('planned');
+  const [editStartError, setEditStartError] = useState<string | null>(null);
+  const [editEndError, setEditEndError] = useState<string | null>(null);
+  const [editStartPickerOpen, setEditStartPickerOpen] = useState(false);
+  const [editEndPickerOpen, setEditEndPickerOpen] = useState(false);
 
   const projectId = selectedProject?.id;
+
+  useEffect(() => {
+    if (editingTask) {
+      setEditStartDate(editingTask.start_date);
+      setEditEndDate(editingTask.end_date);
+      setEditStatus(editingTask.status);
+      setEditStartError(null);
+      setEditEndError(null);
+    }
+  }, [editingTask]);
 
   const { data: tasks } = useQuery({
     queryKey: ['tasks', projectId],
@@ -98,6 +116,43 @@ export const ScheduleScreen = () => {
     setStartDate('');
     setEndDate('');
     setStatus('planned');
+    queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+  };
+
+  const saveEdit = async () => {
+    if (!editingTask || !projectId) return;
+    if (!editStartDate || !editEndDate) {
+      setEditStartError(editStartDate ? null : 'Start date is required');
+      setEditEndError(editEndDate ? null : 'End date is required');
+      return;
+    }
+    const start = parseDateInput(editStartDate);
+    const end = parseDateInput(editEndDate);
+    if (!start) {
+      setEditStartError('Use YYYY-MM-DD');
+      return;
+    }
+    if (!end) {
+      setEditEndError('Use YYYY-MM-DD');
+      return;
+    }
+    if (differenceInCalendarDays(end, start) <= 0) {
+      setEditEndError('End date must be after start date.');
+      return;
+    }
+    setEditStartError(null);
+    setEditEndError(null);
+    const { error } = await supabase
+      .from('tasks')
+      .update({ start_date: editStartDate, end_date: editEndDate, status: editStatus })
+      .eq('id', editingTask.id);
+
+    if (error) {
+      showToast({ title: 'Failed to update task', message: error.message, tone: 'error' });
+      return;
+    }
+    showToast({ title: 'Task updated' });
+    setEditingTask(null);
     queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
   };
 
@@ -173,7 +228,19 @@ export const ScheduleScreen = () => {
                 return (
                   <View key={task.id} style={styles.ganttRow}>
                     <View style={styles.taskLabel}>
-                      <Text style={styles.taskTitle}>{task.title}</Text>
+                      <View style={styles.taskTitleRow}>
+                        <Text style={styles.taskTitle}>{task.title}</Text>
+                        {canEditSchedule ? (
+                          <Pressable
+                            onPress={() => setEditingTask(task)}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel="Edit task"
+                          >
+                            <Text style={styles.editLink}>Edit</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
                       <Chip label={task.status} tone={statusTone[task.status]} />
                     </View>
                     <View style={styles.barTrack}>
@@ -304,6 +371,133 @@ export const ScheduleScreen = () => {
           <Button label="Add task" onPress={submit} />
         </Card>
       ) : null}
+
+      <Modal
+        visible={!!editingTask}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingTask(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setEditingTask(null)} />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit task</Text>
+            {editingTask ? (
+              <>
+                <Text style={styles.editTaskName}>{editingTask.title}</Text>
+                {Platform.OS === 'web' ? (
+                  <>
+                    <View style={styles.dateField}>
+                      <Text style={styles.dateLabel}>Start date</Text>
+                      <input
+                        value={editStartDate}
+                        onChange={(e) => {
+                          setEditStartDate(e.currentTarget.value);
+                          if (editStartError) setEditStartError(null);
+                        }}
+                        type="date"
+                        style={styles.webDateInput as React.CSSProperties}
+                      />
+                      {editStartError ? <Text style={styles.dateErrorText}>{editStartError}</Text> : null}
+                    </View>
+                    <View style={styles.dateField}>
+                      <Text style={styles.dateLabel}>End date</Text>
+                      <input
+                        value={editEndDate}
+                        onChange={(e) => {
+                          setEditEndDate(e.currentTarget.value);
+                          if (editEndError) setEditEndError(null);
+                        }}
+                        type="date"
+                        style={styles.webDateInput as React.CSSProperties}
+                      />
+                      {editEndError ? <Text style={styles.dateErrorText}>{editEndError}</Text> : null}
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.dateField}>
+                      <Text style={styles.dateLabel}>Start date</Text>
+                      <Pressable
+                        onPress={() => setEditStartPickerOpen((prev) => !prev)}
+                        style={[styles.dateControl, editStartError ? styles.dateControlError : null]}
+                        accessibilityRole="button"
+                      >
+                        <Text style={[styles.dateText, !editStartDate ? styles.datePlaceholder : null]}>
+                          {editStartDate || 'Select date'}
+                        </Text>
+                      </Pressable>
+                      {editStartError ? <Text style={styles.dateErrorText}>{editStartError}</Text> : null}
+                      {editStartPickerOpen && DateTimePicker ? (
+                        <View style={styles.pickerWrap}>
+                          <DateTimePicker
+                            value={editStartDate ? parseISO(editStartDate) : new Date()}
+                            mode="date"
+                            display={pickerDisplay}
+                            onChange={handlePickerChange(
+                              setEditStartDate,
+                              setEditStartError,
+                              () => setEditStartPickerOpen(false)
+                            )}
+                          />
+                          {Platform.OS === 'ios' ? (
+                            <Button label="Done" variant="secondary" onPress={() => setEditStartPickerOpen(false)} />
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </View>
+                    <View style={styles.dateField}>
+                      <Text style={styles.dateLabel}>End date</Text>
+                      <Pressable
+                        onPress={() => setEditEndPickerOpen((prev) => !prev)}
+                        style={[styles.dateControl, editEndError ? styles.dateControlError : null]}
+                        accessibilityRole="button"
+                      >
+                        <Text style={[styles.dateText, !editEndDate ? styles.datePlaceholder : null]}>
+                          {editEndDate || 'Select date'}
+                        </Text>
+                      </Pressable>
+                      {editEndError ? <Text style={styles.dateErrorText}>{editEndError}</Text> : null}
+                      {editEndPickerOpen && DateTimePicker ? (
+                        <View style={styles.pickerWrap}>
+                          <DateTimePicker
+                            value={editEndDate ? parseISO(editEndDate) : new Date()}
+                            mode="date"
+                            display={pickerDisplay}
+                            onChange={handlePickerChange(
+                              setEditEndDate,
+                              setEditEndError,
+                              () => setEditEndPickerOpen(false)
+                            )}
+                          />
+                          {Platform.OS === 'ios' ? (
+                            <Button label="Done" variant="secondary" onPress={() => setEditEndPickerOpen(false)} />
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </View>
+                  </>
+                )}
+                <View style={styles.statusRow}>
+                  {(['planned', 'in_progress', 'blocked', 'done'] as const).map((value) => (
+                    <Button
+                      key={value}
+                      label={value}
+                      onPress={() => setEditStatus(value)}
+                      variant={editStatus === value ? 'primary' : 'secondary'}
+                      style={styles.statusButton}
+                    />
+                  ))}
+                </View>
+                <View style={styles.modalActions}>
+                  <Button label="Cancel" variant="secondary" onPress={() => setEditingTask(null)} />
+                  <Button label="Save" onPress={saveEdit} />
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -415,10 +609,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     marginBottom: spacing.xs,
   },
+  taskTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   taskTitle: {
     fontSize: typography.body,
     color: colors.text,
     fontWeight: '600',
+  },
+  editLink: {
+    fontSize: typography.small,
+    color: colors.textMuted,
   },
   barTrack: {
     height: 20,
@@ -431,5 +634,41 @@ const styles = StyleSheet.create({
     height: 20,
     backgroundColor: colors.primary,
     borderRadius: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    padding: spacing.lg,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: typography.h2,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  editTaskName: {
+    fontSize: typography.body,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
 });
