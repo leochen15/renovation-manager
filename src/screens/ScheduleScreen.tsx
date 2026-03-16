@@ -69,6 +69,7 @@ export const ScheduleScreen = () => {
   const [editTitle, setEditTitle] = useState('');
   const [editRanges, setEditRanges] = useState<RangeDraft[]>([]);
   const [editStatus, setEditStatus] = useState<'planned' | 'in_progress' | 'blocked' | 'done'>('planned');
+  const [deletedRangeIds, setDeletedRangeIds] = useState<string[]>([]);
   const [activePicker, setActivePicker] = useState<PickerState>(null);
 
   const projectId = selectedProject?.id;
@@ -83,6 +84,7 @@ export const ScheduleScreen = () => {
           .map((range) => ({ id: range.id, start_date: range.start_date, end_date: range.end_date }))
       );
       setEditStatus(editingGroup.status);
+      setDeletedRangeIds([]);
     }
   }, [editingGroup]);
 
@@ -180,7 +182,16 @@ export const ScheduleScreen = () => {
 
   const removeRange = (context: 'new' | 'edit', index: number) => {
     const setter = context === 'new' ? setRanges : setEditRanges;
-    setter((prev) => prev.filter((_, idx) => idx !== index));
+    setter((prev) => {
+      const next = prev.filter((_, idx) => idx !== index);
+      if (context === 'edit') {
+        const removed = prev[index];
+        if (removed?.id) {
+          setDeletedRangeIds((current) => (current.includes(removed.id as string) ? current : [...current, removed.id as string]));
+        }
+      }
+      return next;
+    });
   };
 
   const handlePickerChange = (context: 'new' | 'edit', index: number, field: 'start_date' | 'end_date') =>
@@ -214,8 +225,8 @@ export const ScheduleScreen = () => {
       if (!startError && !endError) {
         const start = parseDateInput(range.start_date);
         const end = parseDateInput(range.end_date);
-        if (start && end && differenceInCalendarDays(end, start) <= 0) {
-          endError = 'End date must be after start date.';
+        if (start && end && differenceInCalendarDays(end, start) < 0) {
+          endError = 'End date must be on or after start date.';
         }
       }
 
@@ -317,6 +328,16 @@ export const ScheduleScreen = () => {
       }
     }
 
+    if (deletedRangeIds.length > 0) {
+      for (const rangeId of deletedRangeIds) {
+        const { error } = await supabase.from('tasks').delete().eq('id', rangeId);
+        if (error) {
+          showToast({ title: 'Failed to remove date range', message: error.message, tone: 'error' });
+          return;
+        }
+      }
+    }
+
     if (newRanges.length > 0) {
       const insertPayload = newRanges.map((range) => ({
         project_id: projectId,
@@ -343,9 +364,7 @@ export const ScheduleScreen = () => {
     const isWeb = Platform.OS === 'web';
     return currentRanges.map((range, index) => {
       const canRemove =
-        context === 'new'
-          ? currentRanges.length > 1
-          : currentRanges.length > 1 && !range.id;
+        context === 'new' ? currentRanges.length > 1 : currentRanges.length > 1 || !!range.id;
       return (
         <View key={`${context}-range-${range.id ?? index}`} style={styles.rangeBlock}>
           <View style={styles.rangeHeader}>
