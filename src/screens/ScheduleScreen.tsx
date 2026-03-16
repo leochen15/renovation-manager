@@ -24,39 +24,67 @@ const statusTone = {
 
 const baseDayWidth = 24;
 
+type RangeDraft = {
+  id?: string;
+  start_date: string;
+  end_date: string;
+  startError?: string | null;
+  endError?: string | null;
+};
+
+type GroupedTask = {
+  groupKey: string;
+  project_id: string;
+  title: string;
+  created_at: string;
+  status: Task['status'];
+  ranges: Task[];
+};
+
+type PickerState = {
+  context: 'new' | 'edit';
+  index: number;
+  field: 'start_date' | 'end_date';
+} | null;
+
+const makeGroupKey = (task: Task) => `${task.project_id}::${task.title}::${task.created_at}`;
+
+const parseDateInput = (value: string) => {
+  const parsed = parseISO(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const makeRangeKey = (range: Pick<RangeDraft, 'start_date' | 'end_date'>) =>
+  `${range.start_date}::${range.end_date}`;
+
 export const ScheduleScreen = () => {
   const { showToast } = useToast();
   const { selectedProject } = useProjectContext();
   const { canViewSchedule, canEditSchedule } = useProjectPermissions();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [ranges, setRanges] = useState<RangeDraft[]>([{ start_date: '', end_date: '' }]);
   const [status, setStatus] = useState<'planned' | 'in_progress' | 'blocked' | 'done'>('planned');
-  const [startPickerOpen, setStartPickerOpen] = useState(false);
-  const [endPickerOpen, setEndPickerOpen] = useState(false);
-  const [startError, setStartError] = useState<string | null>(null);
-  const [endError, setEndError] = useState<string | null>(null);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [editStartDate, setEditStartDate] = useState('');
-  const [editEndDate, setEditEndDate] = useState('');
+  const [editingGroup, setEditingGroup] = useState<GroupedTask | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editRanges, setEditRanges] = useState<RangeDraft[]>([]);
   const [editStatus, setEditStatus] = useState<'planned' | 'in_progress' | 'blocked' | 'done'>('planned');
-  const [editStartError, setEditStartError] = useState<string | null>(null);
-  const [editEndError, setEditEndError] = useState<string | null>(null);
-  const [editStartPickerOpen, setEditStartPickerOpen] = useState(false);
-  const [editEndPickerOpen, setEditEndPickerOpen] = useState(false);
+  const [activePicker, setActivePicker] = useState<PickerState>(null);
 
   const projectId = selectedProject?.id;
 
   useEffect(() => {
-    if (editingTask) {
-      setEditStartDate(editingTask.start_date);
-      setEditEndDate(editingTask.end_date);
-      setEditStatus(editingTask.status);
-      setEditStartError(null);
-      setEditEndError(null);
+    if (editingGroup) {
+      setEditTitle(editingGroup.title);
+      setEditRanges(
+        editingGroup.ranges
+          .slice()
+          .sort((a, b) => (a.start_date > b.start_date ? 1 : -1))
+          .map((range) => ({ id: range.id, start_date: range.start_date, end_date: range.end_date }))
+      );
+      setEditStatus(editingGroup.status);
     }
-  }, [editingTask]);
+  }, [editingGroup]);
 
   const { data: tasks } = useQuery({
     queryKey: ['tasks', projectId],
@@ -73,97 +101,47 @@ export const ScheduleScreen = () => {
     },
   });
 
-  const submit = async () => {
-    if (!projectId) return;
-    if (!title.trim() || !startDate || !endDate) {
-      if (!title.trim()) {
-        showToast({ title: 'Task name required', tone: 'error' });
+  const groupedTasks = useMemo<GroupedTask[]>(() => {
+    if (!tasks || tasks.length === 0) return [];
+    const groups = new Map<string, GroupedTask>();
+    tasks.forEach((task) => {
+      const key = makeGroupKey(task);
+      const existing = groups.get(key);
+      if (existing) {
+        existing.ranges.push(task);
+      } else {
+        groups.set(key, {
+          groupKey: key,
+          project_id: task.project_id,
+          title: task.title,
+          created_at: task.created_at,
+          status: task.status,
+          ranges: [task],
+        });
       }
-      setStartError(startDate ? null : 'Start date is required');
-      setEndError(endDate ? null : 'End date is required');
-      return;
-    }
-    const start = parseDateInput(startDate);
-    const end = parseDateInput(endDate);
-    if (!start) {
-      setStartError('Use YYYY-MM-DD');
-      return;
-    }
-    if (!end) {
-      setEndError('Use YYYY-MM-DD');
-      return;
-    }
-    if (differenceInCalendarDays(end, start) <= 0) {
-      setEndError('End date must be after start date.');
-      return;
-    }
-    setStartError(null);
-    setEndError(null);
-    const { error } = await supabase.from('tasks').insert({
-      project_id: projectId,
-      title,
-      start_date: startDate,
-      end_date: endDate,
-      status,
     });
-
-    if (error) {
-      showToast({ title: 'Failed to add task', message: error.message, tone: 'error' });
-      return;
-    }
-
-    setTitle('');
-    setStartDate('');
-    setEndDate('');
-    setStatus('planned');
-    queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
-  };
-
-  const saveEdit = async () => {
-    if (!editingTask || !projectId) return;
-    if (!editStartDate || !editEndDate) {
-      setEditStartError(editStartDate ? null : 'Start date is required');
-      setEditEndError(editEndDate ? null : 'End date is required');
-      return;
-    }
-    const start = parseDateInput(editStartDate);
-    const end = parseDateInput(editEndDate);
-    if (!start) {
-      setEditStartError('Use YYYY-MM-DD');
-      return;
-    }
-    if (!end) {
-      setEditEndError('Use YYYY-MM-DD');
-      return;
-    }
-    if (differenceInCalendarDays(end, start) <= 0) {
-      setEditEndError('End date must be after start date.');
-      return;
-    }
-    setEditStartError(null);
-    setEditEndError(null);
-    const { error } = await supabase
-      .from('tasks')
-      .update({ start_date: editStartDate, end_date: editEndDate, status: editStatus })
-      .eq('id', editingTask.id);
-
-    if (error) {
-      showToast({ title: 'Failed to update task', message: error.message, tone: 'error' });
-      return;
-    }
-    showToast({ title: 'Task updated' });
-    setEditingTask(null);
-    queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
-  };
+    const grouped = Array.from(groups.values()).map((group) => ({
+      ...group,
+      ranges: group.ranges.slice().sort((a, b) => (a.start_date > b.start_date ? 1 : -1)),
+    }));
+    grouped.sort((a, b) => {
+      const aStart = a.ranges[0]?.start_date ?? '';
+      const bStart = b.ranges[0]?.start_date ?? '';
+      return aStart > bStart ? 1 : -1;
+    });
+    return grouped;
+  }, [tasks]);
 
   const timeline = useMemo(() => {
-    if (!tasks || tasks.length === 0) return null;
-    const dates = tasks.flatMap((task) => [parseISO(task.start_date), parseISO(task.end_date)]);
+    if (!groupedTasks || groupedTasks.length === 0) return null;
+    const dates = groupedTasks.flatMap((group) =>
+      group.ranges.flatMap((range) => [parseISO(range.start_date), parseISO(range.end_date)])
+    );
     const min = dates.reduce((a, b) => (a < b ? a : b));
     const max = dates.reduce((a, b) => (a > b ? a : b));
     const days = differenceInCalendarDays(max, min) + 1;
     return { min, max, days };
-  }, [tasks]);
+  }, [groupedTasks]);
 
   const baseWidth = Dimensions.get('window').width;
   const availableWidth = Platform.OS === 'web' ? baseWidth - spacing.lg * 2 : baseWidth;
@@ -176,20 +154,306 @@ export const ScheduleScreen = () => {
   const DateTimePicker =
     Platform.OS === 'web' ? null : (require('@react-native-community/datetimepicker').default as React.ComponentType<any>);
 
-  const parseDateInput = (value: string) => {
-    const parsed = parseISO(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  const updateRangeValue = (
+    context: 'new' | 'edit',
+    index: number,
+    field: 'start_date' | 'end_date',
+    value: string
+  ) => {
+    const setter = context === 'new' ? setRanges : setEditRanges;
+    setter((prev) =>
+      prev.map((range, idx) => {
+        if (idx !== index) return range;
+        return {
+          ...range,
+          [field]: value,
+          ...(field === 'start_date' ? { startError: null } : { endError: null }),
+        } as RangeDraft;
+      })
+    );
   };
 
-  const handlePickerChange =
-    (setValue: (value: string) => void, setError: (value: string | null) => void, close: () => void) =>
+  const addRange = (context: 'new' | 'edit') => {
+    const setter = context === 'new' ? setRanges : setEditRanges;
+    setter((prev) => [...prev, { start_date: '', end_date: '' }]);
+  };
+
+  const removeRange = (context: 'new' | 'edit', index: number) => {
+    const setter = context === 'new' ? setRanges : setEditRanges;
+    setter((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handlePickerChange = (context: 'new' | 'edit', index: number, field: 'start_date' | 'end_date') =>
     (_: any, selectedDate: Date | undefined) => {
-      if (Platform.OS !== 'ios') close();
+      if (Platform.OS !== 'ios') setActivePicker(null);
       if (selectedDate) {
-        setValue(format(selectedDate, 'yyyy-MM-dd'));
-        setError(null);
+        updateRangeValue(context, index, field, format(selectedDate, 'yyyy-MM-dd'));
       }
     };
+
+  const validateRanges = (
+    currentRanges: RangeDraft[],
+    setter: React.Dispatch<React.SetStateAction<RangeDraft[]>>
+  ) => {
+    let hasErrors = false;
+    const normalized = currentRanges.map((range) => {
+      let startError: string | null = null;
+      let endError: string | null = null;
+      if (!range.start_date) {
+        startError = 'Start date is required';
+      } else if (!parseDateInput(range.start_date)) {
+        startError = 'Use YYYY-MM-DD';
+      }
+
+      if (!range.end_date) {
+        endError = 'End date is required';
+      } else if (!parseDateInput(range.end_date)) {
+        endError = 'Use YYYY-MM-DD';
+      }
+
+      if (!startError && !endError) {
+        const start = parseDateInput(range.start_date);
+        const end = parseDateInput(range.end_date);
+        if (start && end && differenceInCalendarDays(end, start) <= 0) {
+          endError = 'End date must be after start date.';
+        }
+      }
+
+      if (startError || endError) {
+        hasErrors = true;
+      }
+      return { ...range, startError, endError };
+    });
+
+    setter(normalized);
+    const validRanges = normalized.filter((range) => !range.startError && !range.endError);
+    return { hasErrors, validRanges };
+  };
+
+  const submit = async () => {
+    if (!projectId) return;
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      showToast({ title: 'Task name required', tone: 'error' });
+      return;
+    }
+
+    const { hasErrors, validRanges } = validateRanges(ranges, setRanges);
+    if (hasErrors) return;
+
+    const uniqueRanges = validRanges.filter((range, index, list) => {
+      const key = makeRangeKey(range);
+      return list.findIndex((item) => makeRangeKey(item) === key) === index;
+    });
+
+    if (uniqueRanges.length === 0) {
+      showToast({ title: 'Add at least one date range', tone: 'error' });
+      return;
+    }
+
+    const groupCreatedAt = new Date().toISOString();
+    const payload = uniqueRanges.map((range) => ({
+      project_id: projectId,
+      title: trimmedTitle,
+      start_date: range.start_date,
+      end_date: range.end_date,
+      status,
+      created_at: groupCreatedAt,
+    }));
+
+    const { error } = await supabase.from('tasks').insert(payload);
+
+    if (error) {
+      showToast({ title: 'Failed to add task', message: error.message, tone: 'error' });
+      return;
+    }
+
+    setTitle('');
+    setRanges([{ start_date: '', end_date: '' }]);
+    setStatus('planned');
+    queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+  };
+
+  const saveEdit = async () => {
+    if (!editingGroup || !projectId) return;
+    const trimmedTitle = editTitle.trim();
+    if (!trimmedTitle) {
+      showToast({ title: 'Task name required', tone: 'error' });
+      return;
+    }
+
+    const { hasErrors, validRanges } = validateRanges(editRanges, setEditRanges);
+    if (hasErrors) return;
+
+    const uniqueRanges = validRanges.filter((range, index, list) => {
+      const key = makeRangeKey(range);
+      return list.findIndex((item) => makeRangeKey(item) === key) === index;
+    });
+
+    const existingRanges = uniqueRanges.filter((range) => range.id);
+    const existingKeys = new Set(existingRanges.map((range) => makeRangeKey(range)));
+    const newRanges = uniqueRanges.filter((range) => !range.id && !existingKeys.has(makeRangeKey(range)));
+
+    const { error: groupError } = await supabase
+      .from('tasks')
+      .update({ title: trimmedTitle, status: editStatus })
+      .eq('project_id', projectId)
+      .eq('title', editingGroup.title)
+      .eq('created_at', editingGroup.created_at);
+
+    if (groupError) {
+      showToast({ title: 'Failed to update task', message: groupError.message, tone: 'error' });
+      return;
+    }
+
+    for (const range of existingRanges) {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ start_date: range.start_date, end_date: range.end_date })
+        .eq('id', range.id);
+      if (error) {
+        showToast({ title: 'Failed to update task', message: error.message, tone: 'error' });
+        return;
+      }
+    }
+
+    if (newRanges.length > 0) {
+      const insertPayload = newRanges.map((range) => ({
+        project_id: projectId,
+        title: trimmedTitle,
+        start_date: range.start_date,
+        end_date: range.end_date,
+        status: editStatus,
+        created_at: editingGroup.created_at,
+      }));
+      const { error } = await supabase.from('tasks').insert(insertPayload);
+      if (error) {
+        showToast({ title: 'Failed to add date ranges', message: error.message, tone: 'error' });
+        return;
+      }
+    }
+
+    showToast({ title: 'Task updated' });
+    setEditingGroup(null);
+    setActivePicker(null);
+    queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+  };
+
+  const renderRangeFields = (context: 'new' | 'edit', currentRanges: RangeDraft[]) => {
+    const isWeb = Platform.OS === 'web';
+    return currentRanges.map((range, index) => {
+      const canRemove =
+        context === 'new'
+          ? currentRanges.length > 1
+          : currentRanges.length > 1 && !range.id;
+      return (
+        <View key={`${context}-range-${range.id ?? index}`} style={styles.rangeBlock}>
+          <View style={styles.rangeHeader}>
+            <Text style={styles.rangeTitle}>Date range {index + 1}</Text>
+            {canRemove ? (
+              <Pressable
+                onPress={() => removeRange(context, index)}
+                accessibilityRole="button"
+                accessibilityLabel="Remove date range"
+              >
+                <Text style={styles.removeLink}>Remove</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {isWeb ? (
+            <>
+              <View style={styles.dateField}>
+                <Text style={styles.dateLabel}>Start date</Text>
+                <input
+                  value={range.start_date}
+                  onChange={(event) => updateRangeValue(context, index, 'start_date', event.currentTarget.value)}
+                  type="date"
+                  style={styles.webDateInput as React.CSSProperties}
+                />
+                {range.startError ? <Text style={styles.dateErrorText}>{range.startError}</Text> : null}
+              </View>
+              <View style={styles.dateField}>
+                <Text style={styles.dateLabel}>End date</Text>
+                <input
+                  value={range.end_date}
+                  onChange={(event) => updateRangeValue(context, index, 'end_date', event.currentTarget.value)}
+                  type="date"
+                  style={styles.webDateInput as React.CSSProperties}
+                />
+                {range.endError ? <Text style={styles.dateErrorText}>{range.endError}</Text> : null}
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.dateField}>
+                <Text style={styles.dateLabel}>Start date</Text>
+                <Pressable
+                  onPress={() => setActivePicker({ context, index, field: 'start_date' })}
+                  style={[styles.dateControl, range.startError ? styles.dateControlError : null]}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.dateText, !range.start_date ? styles.datePlaceholder : null]}>
+                    {range.start_date || 'Select date'}
+                  </Text>
+                </Pressable>
+                {range.startError ? <Text style={styles.dateErrorText}>{range.startError}</Text> : null}
+                {activePicker?.context === context &&
+                activePicker.index === index &&
+                activePicker.field === 'start_date' &&
+                DateTimePicker ? (
+                  <View style={styles.pickerWrap}>
+                    <DateTimePicker
+                      value={range.start_date ? parseISO(range.start_date) : new Date()}
+                      mode="date"
+                      display={pickerDisplay}
+                      onChange={handlePickerChange(context, index, 'start_date')}
+                    />
+                    {Platform.OS === 'ios' ? (
+                      <Button label="Done" variant="secondary" onPress={() => setActivePicker(null)} />
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
+              <View style={styles.dateField}>
+                <Text style={styles.dateLabel}>End date</Text>
+                <Pressable
+                  onPress={() => setActivePicker({ context, index, field: 'end_date' })}
+                  style={[styles.dateControl, range.endError ? styles.dateControlError : null]}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.dateText, !range.end_date ? styles.datePlaceholder : null]}>
+                    {range.end_date || 'Select date'}
+                  </Text>
+                </Pressable>
+                {range.endError ? <Text style={styles.dateErrorText}>{range.endError}</Text> : null}
+                {activePicker?.context === context &&
+                activePicker.index === index &&
+                activePicker.field === 'end_date' &&
+                DateTimePicker ? (
+                  <View style={styles.pickerWrap}>
+                    <DateTimePicker
+                      value={range.end_date ? parseISO(range.end_date) : new Date()}
+                      mode="date"
+                      display={pickerDisplay}
+                      onChange={handlePickerChange(context, index, 'end_date')}
+                    />
+                    {Platform.OS === 'ios' ? (
+                      <Button label="Done" variant="secondary" onPress={() => setActivePicker(null)} />
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
+            </>
+          )}
+        </View>
+      );
+    });
+  };
+
+  const closeEdit = () => {
+    setEditingGroup(null);
+    setActivePicker(null);
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -200,10 +464,10 @@ export const ScheduleScreen = () => {
       {!projectId ? (
         <EmptyState title="Select a project" description="Create or select a project to see the schedule." />
       ) : null}
-      {projectId && canViewSchedule && (!tasks || tasks.length === 0) ? (
+      {projectId && canViewSchedule && (!groupedTasks || groupedTasks.length === 0) ? (
         <EmptyState title="No tasks yet" description="Add tasks to see them on the timeline." />
       ) : null}
-      {projectId && canViewSchedule && tasks && tasks.length > 0 ? (
+      {projectId && canViewSchedule && groupedTasks && groupedTasks.length > 0 ? (
         <View style={styles.ganttWrapper}>
           <ScrollView horizontal showsHorizontalScrollIndicator>
             <View style={[styles.ganttBody, { width: timelineWidth }]}>
@@ -220,19 +484,15 @@ export const ScheduleScreen = () => {
                     })
                   : null}
               </View>
-              {tasks.map((task) => {
-                const start = parseISO(task.start_date);
-                const end = parseISO(task.end_date);
-                const offset = timeline ? differenceInCalendarDays(start, timeline.min) : 0;
-                const duration = differenceInCalendarDays(end, start) + 1;
+              {groupedTasks.map((group) => {
                 return (
-                  <View key={task.id} style={styles.ganttRow}>
+                  <View key={group.groupKey} style={styles.ganttRow}>
                     <View style={styles.taskLabel}>
                       <View style={styles.taskTitleRow}>
-                        <Text style={styles.taskTitle}>{task.title}</Text>
+                        <Text style={styles.taskTitle}>{group.title}</Text>
                         {canEditSchedule ? (
                           <Pressable
-                            onPress={() => setEditingTask(task)}
+                            onPress={() => setEditingGroup(group)}
                             hitSlop={8}
                             accessibilityRole="button"
                             accessibilityLabel="Edit task"
@@ -241,18 +501,27 @@ export const ScheduleScreen = () => {
                           </Pressable>
                         ) : null}
                       </View>
-                      <Chip label={task.status} tone={statusTone[task.status]} />
+                      <Chip label={group.status} tone={statusTone[group.status]} />
                     </View>
                     <View style={styles.barTrack}>
-                      <View
-                        style={[
-                          styles.bar,
-                          {
-                            left: offset * displayDayWidth,
-                            width: duration * displayDayWidth,
-                          },
-                        ]}
-                      />
+                      {group.ranges.map((range, index) => {
+                        const start = parseISO(range.start_date);
+                        const end = parseISO(range.end_date);
+                        const offset = timeline ? differenceInCalendarDays(start, timeline.min) : 0;
+                        const duration = differenceInCalendarDays(end, start) + 1;
+                        return (
+                          <View
+                            key={range.id ?? `${group.groupKey}-${index}`}
+                            style={[
+                              styles.bar,
+                              {
+                                left: offset * displayDayWidth,
+                                width: duration * displayDayWidth,
+                              },
+                            ]}
+                          />
+                        );
+                      })}
                     </View>
                   </View>
                 );
@@ -266,97 +535,14 @@ export const ScheduleScreen = () => {
         <Card>
           <Text style={styles.cardTitle}>New task</Text>
           <Input label="Task name" value={title} onChangeText={setTitle} placeholder="Install cabinets" />
-          {Platform.OS === 'web' ? (
-            <>
-              <View style={styles.dateField}>
-                <Text style={styles.dateLabel}>Start date</Text>
-                <input
-                  id="start-date-input"
-                  value={startDate}
-                  onChange={(event) => {
-                    setStartDate(event.currentTarget.value);
-                    if (startError) setStartError(null);
-                  }}
-                  type="date"
-                  style={styles.webDateInput as React.CSSProperties}
-                />
-                {startError ? <Text style={styles.dateErrorText}>{startError}</Text> : null}
-              </View>
-              <View style={styles.dateField}>
-                <Text style={styles.dateLabel}>End date</Text>
-                <input
-                  id="end-date-input"
-                  value={endDate}
-                  onChange={(event) => {
-                    setEndDate(event.currentTarget.value);
-                    if (endError) setEndError(null);
-                  }}
-                  type="date"
-                  style={styles.webDateInput as React.CSSProperties}
-                />
-                {endError ? <Text style={styles.dateErrorText}>{endError}</Text> : null}
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={styles.dateField}>
-                <Text style={styles.dateLabel}>Start date</Text>
-                <Pressable
-                  onPress={() => setStartPickerOpen((prev) => !prev)}
-                  style={[styles.dateControl, startError ? styles.dateControlError : null]}
-                  accessibilityRole="button"
-                >
-                  <Text style={[styles.dateText, !startDate ? styles.datePlaceholder : null]}>
-                    {startDate || 'Select date'}
-                  </Text>
-                </Pressable>
-                {startError ? <Text style={styles.dateErrorText}>{startError}</Text> : null}
-                {startPickerOpen ? (
-                  <View style={styles.pickerWrap}>
-                    <DateTimePicker
-                      value={startDate ? parseISO(startDate) : new Date()}
-                      mode="date"
-                      display={pickerDisplay}
-                      onChange={handlePickerChange(
-                        setStartDate,
-                        setStartError,
-                        () => setStartPickerOpen(false)
-                      )}
-                    />
-                    {Platform.OS === 'ios' ? (
-                      <Button label="Done" variant="secondary" onPress={() => setStartPickerOpen(false)} />
-                    ) : null}
-                  </View>
-                ) : null}
-              </View>
-              <View style={styles.dateField}>
-                <Text style={styles.dateLabel}>End date</Text>
-                <Pressable
-                  onPress={() => setEndPickerOpen((prev) => !prev)}
-                  style={[styles.dateControl, endError ? styles.dateControlError : null]}
-                  accessibilityRole="button"
-                >
-                  <Text style={[styles.dateText, !endDate ? styles.datePlaceholder : null]}>
-                    {endDate || 'Select date'}
-                  </Text>
-                </Pressable>
-                {endError ? <Text style={styles.dateErrorText}>{endError}</Text> : null}
-                {endPickerOpen ? (
-                  <View style={styles.pickerWrap}>
-                    <DateTimePicker
-                      value={endDate ? parseISO(endDate) : new Date()}
-                      mode="date"
-                      display={pickerDisplay}
-                      onChange={handlePickerChange(setEndDate, setEndError, () => setEndPickerOpen(false))}
-                    />
-                    {Platform.OS === 'ios' ? (
-                      <Button label="Done" variant="secondary" onPress={() => setEndPickerOpen(false)} />
-                    ) : null}
-                  </View>
-                ) : null}
-              </View>
-            </>
-          )}
+          {renderRangeFields('new', ranges)}
+          <Pressable
+            onPress={() => addRange('new')}
+            accessibilityRole="button"
+            accessibilityLabel="Add date range"
+          >
+            <Text style={styles.addLink}>Add Date(s)</Text>
+          </Pressable>
           <View style={styles.statusRow}>
             {(['planned', 'in_progress', 'blocked', 'done'] as const).map((value) => (
               <Button
@@ -372,112 +558,22 @@ export const ScheduleScreen = () => {
         </Card>
       ) : null}
 
-      <Modal
-        visible={!!editingTask}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEditingTask(null)}
-      >
+      <Modal visible={!!editingGroup} transparent animationType="fade" onRequestClose={closeEdit}>
         <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setEditingTask(null)} />
+          <Pressable style={styles.modalBackdrop} onPress={closeEdit} />
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Edit task</Text>
-            {editingTask ? (
+            {editingGroup ? (
               <>
-                <Text style={styles.editTaskName}>{editingTask.title}</Text>
-                {Platform.OS === 'web' ? (
-                  <>
-                    <View style={styles.dateField}>
-                      <Text style={styles.dateLabel}>Start date</Text>
-                      <input
-                        value={editStartDate}
-                        onChange={(e) => {
-                          setEditStartDate(e.currentTarget.value);
-                          if (editStartError) setEditStartError(null);
-                        }}
-                        type="date"
-                        style={styles.webDateInput as React.CSSProperties}
-                      />
-                      {editStartError ? <Text style={styles.dateErrorText}>{editStartError}</Text> : null}
-                    </View>
-                    <View style={styles.dateField}>
-                      <Text style={styles.dateLabel}>End date</Text>
-                      <input
-                        value={editEndDate}
-                        onChange={(e) => {
-                          setEditEndDate(e.currentTarget.value);
-                          if (editEndError) setEditEndError(null);
-                        }}
-                        type="date"
-                        style={styles.webDateInput as React.CSSProperties}
-                      />
-                      {editEndError ? <Text style={styles.dateErrorText}>{editEndError}</Text> : null}
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    <View style={styles.dateField}>
-                      <Text style={styles.dateLabel}>Start date</Text>
-                      <Pressable
-                        onPress={() => setEditStartPickerOpen((prev) => !prev)}
-                        style={[styles.dateControl, editStartError ? styles.dateControlError : null]}
-                        accessibilityRole="button"
-                      >
-                        <Text style={[styles.dateText, !editStartDate ? styles.datePlaceholder : null]}>
-                          {editStartDate || 'Select date'}
-                        </Text>
-                      </Pressable>
-                      {editStartError ? <Text style={styles.dateErrorText}>{editStartError}</Text> : null}
-                      {editStartPickerOpen && DateTimePicker ? (
-                        <View style={styles.pickerWrap}>
-                          <DateTimePicker
-                            value={editStartDate ? parseISO(editStartDate) : new Date()}
-                            mode="date"
-                            display={pickerDisplay}
-                            onChange={handlePickerChange(
-                              setEditStartDate,
-                              setEditStartError,
-                              () => setEditStartPickerOpen(false)
-                            )}
-                          />
-                          {Platform.OS === 'ios' ? (
-                            <Button label="Done" variant="secondary" onPress={() => setEditStartPickerOpen(false)} />
-                          ) : null}
-                        </View>
-                      ) : null}
-                    </View>
-                    <View style={styles.dateField}>
-                      <Text style={styles.dateLabel}>End date</Text>
-                      <Pressable
-                        onPress={() => setEditEndPickerOpen((prev) => !prev)}
-                        style={[styles.dateControl, editEndError ? styles.dateControlError : null]}
-                        accessibilityRole="button"
-                      >
-                        <Text style={[styles.dateText, !editEndDate ? styles.datePlaceholder : null]}>
-                          {editEndDate || 'Select date'}
-                        </Text>
-                      </Pressable>
-                      {editEndError ? <Text style={styles.dateErrorText}>{editEndError}</Text> : null}
-                      {editEndPickerOpen && DateTimePicker ? (
-                        <View style={styles.pickerWrap}>
-                          <DateTimePicker
-                            value={editEndDate ? parseISO(editEndDate) : new Date()}
-                            mode="date"
-                            display={pickerDisplay}
-                            onChange={handlePickerChange(
-                              setEditEndDate,
-                              setEditEndError,
-                              () => setEditEndPickerOpen(false)
-                            )}
-                          />
-                          {Platform.OS === 'ios' ? (
-                            <Button label="Done" variant="secondary" onPress={() => setEditEndPickerOpen(false)} />
-                          ) : null}
-                        </View>
-                      ) : null}
-                    </View>
-                  </>
-                )}
+                <Input label="Task name" value={editTitle} onChangeText={setEditTitle} />
+                {renderRangeFields('edit', editRanges)}
+                <Pressable
+                  onPress={() => addRange('edit')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add date range"
+                >
+                  <Text style={styles.addLink}>Add Date(s)</Text>
+                </Pressable>
                 <View style={styles.statusRow}>
                   {(['planned', 'in_progress', 'blocked', 'done'] as const).map((value) => (
                     <Button
@@ -490,7 +586,7 @@ export const ScheduleScreen = () => {
                   ))}
                 </View>
                 <View style={styles.modalActions}>
-                  <Button label="Cancel" variant="secondary" onPress={() => setEditingTask(null)} />
+                  <Button label="Cancel" variant="secondary" onPress={closeEdit} />
                   <Button label="Save" onPress={saveEdit} />
                 </View>
               </>
@@ -571,6 +667,32 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     minWidth: 110,
   },
+  rangeBlock: {
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: spacing.sm,
+  },
+  rangeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  rangeTitle: {
+    fontSize: typography.body,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  addLink: {
+    fontSize: typography.small,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+  removeLink: {
+    fontSize: typography.small,
+    color: colors.textMuted,
+  },
   ganttWrapper: {
     borderRadius: 16,
     borderWidth: 1,
@@ -628,6 +750,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.sm,
     backgroundColor: colors.surfaceAlt,
     borderRadius: 10,
+    overflow: 'hidden',
   },
   bar: {
     position: 'absolute',
@@ -660,11 +783,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
     marginBottom: spacing.sm,
-  },
-  editTaskName: {
-    fontSize: typography.body,
-    color: colors.textMuted,
-    marginBottom: spacing.md,
   },
   modalActions: {
     flexDirection: 'row',

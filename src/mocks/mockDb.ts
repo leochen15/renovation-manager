@@ -90,6 +90,28 @@ export const mockTasks: Task[] = [
     sort_order: 3,
     created_at: now(),
   },
+  {
+    id: 'task-4',
+    project_id: 'project-1',
+    title: 'Tile install',
+    start_date: '2026-03-01',
+    end_date: '2026-03-03',
+    status: 'planned',
+    trade_id: null,
+    sort_order: 4,
+    created_at: '2026-02-20T12:00:00.000Z',
+  },
+  {
+    id: 'task-5',
+    project_id: 'project-1',
+    title: 'Tile install',
+    start_date: '2026-03-08',
+    end_date: '2026-03-10',
+    status: 'planned',
+    trade_id: null,
+    sort_order: 5,
+    created_at: '2026-02-20T12:00:00.000Z',
+  },
 ];
 
 export const mockNotices: Notice[] = [
