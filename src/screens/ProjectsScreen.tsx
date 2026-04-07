@@ -16,7 +16,9 @@ import { ProjectsStackParamList } from '../core/ProjectsNavigator';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useToast } from '../core/ToastContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Platform } from 'react-native';
 import { usePendingInvites } from '../hooks/usePendingInvites';
+import { trackEvent } from '../lib/analytics';
 
 export const ProjectsScreen = () => {
   const { showToast } = useToast();
@@ -82,6 +84,10 @@ export const ProjectsScreen = () => {
       }))
     );
 
+    trackEvent('project_create', {
+      has_address: !!address.trim(),
+    });
+
     setName('');
     setAddress('');
     queryClient.invalidateQueries({ queryKey: ['projects', user.id] });
@@ -109,6 +115,9 @@ export const ProjectsScreen = () => {
     queryClient.invalidateQueries({ queryKey: ['pending-invites'] });
     queryClient.invalidateQueries({ queryKey: ['projects', user.id] });
     refetchProjects();
+    trackEvent('invite_accept', {
+      role: invite.role ?? 'collaborator',
+    });
     showToast({ title: 'Invite accepted', message: 'You have been added to the project.', tone: 'success' });
   };
 
@@ -177,7 +186,13 @@ export const ProjectsScreen = () => {
   const userPendingInvites = pendingInvites?.filter((invite) => invite.email === currentEmail) ?? [];
 
   return (
-    <ScrollView style={[styles.container, { paddingTop: spacing.xl + insets.top }]} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.container, { paddingTop: spacing.xl + insets.top }]}
+      contentContainerStyle={[
+        styles.content,
+        Platform.OS === 'web' ? styles.contentWebCompact : null,
+      ]}
+    >
       <SectionHeader title="Projects" subtitle="Create and manage your renovation projects in a calmer, more polished workspace." />
 
       <Card style={styles.overviewCard}>
@@ -289,6 +304,9 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: spacing.xl,
+  },
+  contentWebCompact: {
+    paddingBottom: spacing.xl + 88,
   },
   overviewCard: {
     backgroundColor: colors.primary,

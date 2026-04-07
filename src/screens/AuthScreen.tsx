@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/Button';
@@ -6,6 +6,7 @@ import { Input } from '../components/Input';
 import { EmailVerificationModal } from '../components/EmailVerificationModal';
 import { colors, spacing, typography } from '../styles/theme';
 import { useToast } from '../core/ToastContext';
+import { trackEvent } from '../lib/analytics';
 
 export const AuthScreen = () => {
   const { showToast } = useToast();
@@ -14,7 +15,12 @@ export const AuthScreen = () => {
   const [loading, setLoading] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
 
+  useEffect(() => {
+    trackEvent('auth_view');
+  }, []);
+
   const handleSignIn = async () => {
+    trackEvent('sign_in_submit', { method: 'password' });
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
@@ -22,6 +28,7 @@ export const AuthScreen = () => {
   };
 
   const handleSignUp = async () => {
+    trackEvent('sign_up_submit', { method: 'password' });
     setLoading(true);
     const { error } = await supabase.auth.signUp({ email, password });
     setLoading(false);
@@ -39,6 +46,7 @@ export const AuthScreen = () => {
   };
 
   const handleMagicLink = async () => {
+    trackEvent('magic_link_submit', { method: 'magic_link' });
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({ email });
     setLoading(false);

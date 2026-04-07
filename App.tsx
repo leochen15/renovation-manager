@@ -21,8 +21,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   rootWeb: {
-    height: '100vh',
+    height: '100dvh',
+    minHeight: '100dvh',
     width: '100%',
     overflow: 'auto',
+    paddingBottom: 'env(safe-area-inset-bottom)',
   },
 });

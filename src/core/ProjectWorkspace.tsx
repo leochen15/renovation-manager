@@ -19,6 +19,7 @@ import { ProjectsStackParamList } from './ProjectsNavigator';
 import { supabase } from '../lib/supabase';
 import { Task } from '../types';
 import { WorkspaceScrollProvider } from './WorkspaceScrollContext';
+import { trackEvent } from '../lib/analytics';
 
 const tabs = [
   { key: 'schedule', label: 'Schedule', component: ScheduleScreen },
@@ -135,6 +136,14 @@ export const ProjectWorkspace = () => {
   }, [availableTabs, canViewInvites, isLoadingInvites, pendingInvites, selectedProject]);
 
   useEffect(() => {
+    if (!selectedProject) return;
+
+    trackEvent('workspace_open', {
+      tab: activeKey,
+    });
+  }, [activeKey, selectedProject]);
+
+  useEffect(() => {
     setWorkspaceScrollY(0);
   }, [activeKey, projectId]);
 
@@ -211,7 +220,13 @@ export const ProjectWorkspace = () => {
         style={[
           styles.shell,
           isWideLayout ? styles.shellWide : null,
-          { paddingTop: isWideLayout ? spacing.lg : spacing.md + insets.top * 0.15 },
+          {
+            paddingTop: isWideLayout ? spacing.lg : spacing.md + insets.top * 0.15,
+            paddingBottom:
+              Platform.OS === 'web' && !isWideLayout
+                ? spacing.xl + 88
+                : spacing.md,
+          },
         ]}
       >
         {isWideLayout ? (
