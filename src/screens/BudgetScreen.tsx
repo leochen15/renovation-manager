@@ -13,6 +13,7 @@ import { colors, radius, spacing, typography } from '../styles/theme';
 import { useProjectPermissions } from '../hooks/useProjectPermissions';
 import { BudgetItem, BudgetStatus } from '../types';
 import { useToast } from '../core/ToastContext';
+import { useWorkspaceScroll } from '../core/WorkspaceScrollContext';
 
 const statusTone = {
   planned: 'default',
@@ -22,6 +23,7 @@ const statusTone = {
 
 export const BudgetScreen = () => {
   const { showToast } = useToast();
+  const { handleScroll } = useWorkspaceScroll();
   const { selectedProject } = useProjectContext();
   const { canViewBudget, canEditBudget } = useProjectPermissions();
   const queryClient = useQueryClient();
@@ -247,7 +249,7 @@ export const BudgetScreen = () => {
   const hasItems = (items?.length ?? 0) > 0;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} onScroll={handleScroll} scrollEventThrottle={16}>
       <SectionHeader title="Budget" subtitle="Track estimated vs actual spend." />
       {!canViewBudget ? (
         <EmptyState title="View-only access" description="You do not have access to view budget items." />
@@ -308,11 +310,16 @@ export const BudgetScreen = () => {
         </Card>
       ) : null}
       {projectId && canViewBudget ? (
-        <Card>
-          <Text style={styles.summaryTitle}>Summary</Text>
-          <Text style={styles.summaryValue}>Estimated: ${totals.estimate.toFixed(2)}</Text>
-          <Text style={styles.summaryValue}>Actual: ${totals.actual.toFixed(2)}</Text>
-        </Card>
+        <View style={styles.summaryGrid}>
+          <Card style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>Estimated</Text>
+            <Text style={styles.summaryAmount}>${totals.estimate.toFixed(2)}</Text>
+          </Card>
+          <Card style={[styles.summaryCard, styles.summaryCardAccent]}>
+            <Text style={styles.summaryTitle}>Actual</Text>
+            <Text style={styles.summaryAmount}>${totals.actual.toFixed(2)}</Text>
+          </Card>
+        </View>
       ) : null}
       {projectId && canViewBudget ? (
         <View style={styles.searchRow}>
@@ -479,11 +486,20 @@ export const BudgetScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: spacing.lg,
-    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: 'transparent',
   },
   content: {
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  summaryGrid: {
+    gap: spacing.md,
+  },
+  summaryCard: {
+    marginBottom: 0,
+  },
+  summaryCardAccent: {
+    backgroundColor: colors.surfaceAlt,
   },
   searchRow: {
     flexDirection: 'row',
@@ -494,10 +510,12 @@ const styles = StyleSheet.create({
   searchInputWrap: {
     flex: 1,
     marginBottom: 0,
+    marginTop: spacing.sm,
   },
   filterButton: {
     minWidth: 90,
     backgroundColor: '#6C8A7E',
+    marginTop: spacing.sm,
   },
   categoryComboboxWrap: {
     position: 'relative',
@@ -582,16 +600,21 @@ const styles = StyleSheet.create({
     fontSize: typography.h2,
     fontWeight: '600',
     marginBottom: spacing.sm,
+    color: colors.text,
   },
   summaryTitle: {
-    fontSize: typography.h2,
+    fontSize: typography.small,
     fontWeight: '600',
     marginBottom: spacing.sm,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
-  summaryValue: {
-    fontSize: typography.body,
+  summaryAmount: {
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: '700',
     color: colors.text,
-    marginBottom: spacing.xs,
   },
   statusRow: {
     flexDirection: 'row',
@@ -617,6 +640,7 @@ const styles = StyleSheet.create({
   itemDetail: {
     fontSize: typography.body,
     color: colors.textMuted,
+    lineHeight: 24,
   },
   actionRow: {
     flexDirection: 'row',

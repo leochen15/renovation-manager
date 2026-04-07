@@ -23,7 +23,15 @@ export const Button = ({ label, onPress, variant = 'primary', style, disabled }:
         style,
       ]}
     >
-      <Text style={[styles.text, variant === 'ghost' ? styles.textGhost : null]}>{label}</Text>
+      <Text
+        style={[
+          styles.text,
+          variant === 'secondary' ? styles.textSecondary : null,
+          variant === 'ghost' ? styles.textGhost : null,
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 };
@@ -38,15 +46,23 @@ const styles = StyleSheet.create({
   },
   primary: {
     backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   secondary: {
     backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   ghost: {
     backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   danger: {
     backgroundColor: colors.danger,
+    borderWidth: 1,
+    borderColor: colors.danger,
   },
   pressed: {
     opacity: 0.85,
@@ -55,9 +71,12 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   text: {
-    color: '#fff',
+    color: colors.white,
     fontSize: typography.body,
     fontWeight: '600',
+  },
+  textSecondary: {
+    color: colors.text,
   },
   textGhost: {
     color: colors.primary,

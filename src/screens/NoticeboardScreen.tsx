@@ -14,9 +14,11 @@ import { colors, spacing, typography } from '../styles/theme';
 import { useProjectPermissions } from '../hooks/useProjectPermissions';
 import { Notice } from '../types';
 import { useToast } from '../core/ToastContext';
+import { useWorkspaceScroll } from '../core/WorkspaceScrollContext';
 
 export const NoticeboardScreen = () => {
   const { showToast } = useToast();
+  const { handleScroll } = useWorkspaceScroll();
   const { selectedProject } = useProjectContext();
   const { canViewNoticeboard, canEditNoticeboard } = useProjectPermissions();
   const queryClient = useQueryClient();
@@ -87,7 +89,7 @@ export const NoticeboardScreen = () => {
   const hasNotices = (notices?.length ?? 0) > 0;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} onScroll={handleScroll} scrollEventThrottle={16}>
       <SectionHeader title="Noticeboard" subtitle="Capture decisions, updates, and issues." />
       {!canViewNoticeboard ? (
         <EmptyState title="View-only access" description="You do not have access to view the noticeboard." />
@@ -136,16 +138,17 @@ export const NoticeboardScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: spacing.lg,
-    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: 'transparent',
   },
   content: {
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   cardTitle: {
     fontSize: typography.h2,
     fontWeight: '600',
     marginBottom: spacing.sm,
+    color: colors.text,
   },
   noticeTitle: {
     fontSize: typography.h2,
@@ -157,18 +160,20 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     color: colors.text,
     marginBottom: spacing.sm,
+    lineHeight: 24,
   },
   noticeMeta: {
     fontSize: typography.small,
     color: colors.textMuted,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
+    marginTop: spacing.xs,
   },
   noticeActions: {
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
   },
 });

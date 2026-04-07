@@ -178,7 +178,17 @@ export const ProjectsScreen = () => {
 
   return (
     <ScrollView style={[styles.container, { paddingTop: spacing.xl + insets.top }]} contentContainerStyle={styles.content}>
-      <SectionHeader title="Projects" subtitle="Create and manage your renovation projects." />
+      <SectionHeader title="Projects" subtitle="Create and manage your renovation projects in a calmer, more polished workspace." />
+
+      <Card style={styles.overviewCard}>
+        <Text style={styles.overviewEyebrow}>Workspace</Text>
+        <Text style={styles.overviewTitle}>{projects.length} active project{projects.length === 1 ? '' : 's'}</Text>
+        <Text style={styles.overviewSubtitle}>
+          {hasPendingInvites
+            ? `${userPendingInvites.length} pending invite${userPendingInvites.length === 1 ? '' : 's'} ready for review.`
+            : 'Keep project setup, permissions, and account access in one tidy place.'}
+        </Text>
+      </Card>
       
       {userPendingInvites.length > 0 ? (
         <Card style={styles.invitesCard}>
@@ -274,22 +284,49 @@ export const ProjectsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
     backgroundColor: colors.background
   },
   content: {
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  overviewCard: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  overviewEyebrow: {
+    fontSize: typography.small,
+    color: '#b7ccc3',
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  overviewTitle: {
+    marginTop: spacing.sm,
+    fontSize: 32,
+    lineHeight: 38,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  overviewSubtitle: {
+    marginTop: spacing.xs,
+    fontSize: typography.body,
+    lineHeight: 24,
+    color: '#dde7e2',
   },
   cardTitle: {
     fontSize: typography.h2,
     fontWeight: '600',
     marginBottom: spacing.sm,
+    color: colors.text,
   },
   listTitle: {
     fontSize: typography.small,
     color: colors.textMuted,
     marginBottom: spacing.sm,
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   projectTitle: {
     fontSize: typography.h2,
@@ -304,6 +341,7 @@ const styles = StyleSheet.create({
   activeCard: {
     borderColor: colors.primary,
     borderWidth: 1.5,
+    backgroundColor: colors.surfaceMuted,
   },
   permissionGroup: {
     paddingVertical: spacing.sm,
@@ -345,8 +383,9 @@ const styles = StyleSheet.create({
   },
   invitesCard: {
     marginBottom: spacing.md,
-    borderColor: colors.primary,
+    borderColor: colors.borderStrong,
     borderWidth: 1,
+    backgroundColor: colors.surfaceAlt,
   },
   inviteCard: {
     marginTop: spacing.sm,

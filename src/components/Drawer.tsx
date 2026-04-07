@@ -1,9 +1,9 @@
 import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, typography } from '../styles/theme';
+import { colors, radius, spacing, typography } from '../styles/theme';
 
-const drawerWidth = 260;
+const drawerWidth = 300;
 
 type DrawerItem = {
   key: string;
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   },
   drawer: {
     width: drawerWidth,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceAlt,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
     borderRightWidth: 1,
@@ -73,8 +73,12 @@ const styles = StyleSheet.create({
   },
   item: {
     paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
+    marginBottom: spacing.xs,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   itemText: {
     fontSize: typography.body,

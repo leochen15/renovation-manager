@@ -20,23 +20,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radius.sm,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   default: {
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.surfaceMuted,
   },
   success: {
     backgroundColor: colors.primaryLight,
+    borderColor: colors.primaryLight,
   },
   warning: {
-    backgroundColor: '#f7edd6',
+    backgroundColor: '#f2e5c6',
+    borderColor: '#e2cd9f',
   },
   danger: {
-    backgroundColor: '#f8e0e0',
+    backgroundColor: '#f1dddd',
+    borderColor: '#e5c3c3',
   },
   text: {
     fontSize: typography.small,
     color: colors.text,
     fontWeight: '600',
+    textTransform: 'capitalize',
   },
 });

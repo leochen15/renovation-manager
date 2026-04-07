@@ -13,6 +13,7 @@ import { useProjectPermissions } from '../hooks/useProjectPermissions';
 import { useProjectMembers } from '../hooks/useProjectMembers';
 import { ProjectInvite, ProjectMemberWithProfile, Role } from '../types';
 import { useToast } from '../core/ToastContext';
+import { useWorkspaceScroll } from '../core/WorkspaceScrollContext';
 
 type Props = {
   onBack?: () => void;
@@ -20,6 +21,7 @@ type Props = {
 
 export const InvitesScreen = ({ onBack }: Props) => {
   const { showToast } = useToast();
+  const { handleScroll } = useWorkspaceScroll();
   const { selectedProject } = useProjectContext();
   const { canViewInvites, canEditInvites } = useProjectPermissions();
   const queryClient = useQueryClient();
@@ -164,7 +166,7 @@ export const InvitesScreen = ({ onBack }: Props) => {
   const isOwner = selectedProject && currentUserId && selectedProject.owner_id === currentUserId;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} onScroll={handleScroll} scrollEventThrottle={16}>
       <SectionHeader title="Invites" subtitle="Invite collaborators to your project." />
       {!canViewInvites ? (
         <EmptyState title="View-only access" description="You do not have access to view invites." />

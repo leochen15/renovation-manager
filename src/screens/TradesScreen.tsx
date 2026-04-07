@@ -12,9 +12,11 @@ import { colors, spacing, typography } from '../styles/theme';
 import { useProjectPermissions } from '../hooks/useProjectPermissions';
 import { Trade } from '../types';
 import { useToast } from '../core/ToastContext';
+import { useWorkspaceScroll } from '../core/WorkspaceScrollContext';
 
 export const TradesScreen = () => {
   const { showToast } = useToast();
+  const { handleScroll } = useWorkspaceScroll();
   const { selectedProject } = useProjectContext();
   const { canViewTrades, canEditTrades } = useProjectPermissions();
   const queryClient = useQueryClient();
@@ -69,7 +71,7 @@ export const TradesScreen = () => {
   const hasTrades = (trades?.length ?? 0) > 0;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} onScroll={handleScroll} scrollEventThrottle={16}>
       <SectionHeader title="Trades" subtitle="Keep your contractor contacts handy." />
       {!canViewTrades ? (
         <EmptyState title="View-only access" description="You do not have access to view trade contacts." />
@@ -108,16 +110,17 @@ export const TradesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: spacing.lg,
-    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: 'transparent',
   },
   content: {
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   cardTitle: {
     fontSize: typography.h2,
     fontWeight: '600',
     marginBottom: spacing.sm,
+    color: colors.text,
   },
   tradeName: {
     fontSize: typography.h2,
@@ -128,5 +131,6 @@ const styles = StyleSheet.create({
   tradeDetail: {
     fontSize: typography.body,
     color: colors.textMuted,
+    lineHeight: 24,
   },
 });

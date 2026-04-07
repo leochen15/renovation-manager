@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '../styles/theme';
 
@@ -26,7 +26,7 @@ export const ToastHost = ({ toasts, onDismiss }: Props) => {
   if (toasts.length === 0) return null;
 
   return (
-    <View pointerEvents="box-none" style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
+    <View style={[styles.container, { paddingTop: insets.top + spacing.sm, pointerEvents: 'box-none' }]}>
       {toasts.map((toast) => (
         <Pressable
           key={toast.id}
@@ -56,11 +56,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    ...(Platform.OS === 'web'
+      ? {
+          boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.12)',
+        }
+      : {
+          shadowColor: '#000',
+          shadowOpacity: 0.12,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 3,
+        }),
   },
   title: {
     fontSize: typography.body,

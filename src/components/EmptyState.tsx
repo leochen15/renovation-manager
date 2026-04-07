@@ -15,7 +15,7 @@ const styles = StyleSheet.create({
   container: {
     padding: spacing.lg,
     backgroundColor: colors.surfaceAlt,
-    borderRadius: 16,
+    borderRadius: 28,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -23,10 +23,11 @@ const styles = StyleSheet.create({
     fontSize: typography.h2,
     color: colors.text,
     fontWeight: '600',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   description: {
     fontSize: typography.body,
     color: colors.textMuted,
+    lineHeight: 24,
   },
 });

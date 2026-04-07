@@ -13,7 +13,7 @@ export const SectionHeader = ({ title, subtitle }: { title: string; subtitle?: s
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   title: {
     fontSize: typography.h1,
@@ -21,8 +21,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   subtitle: {
-    marginTop: spacing.xs,
-    fontSize: typography.small,
+    marginTop: spacing.sm,
+    fontSize: typography.body,
     color: colors.textMuted,
+    maxWidth: 720,
+    lineHeight: 24,
   },
 });

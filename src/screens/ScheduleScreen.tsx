@@ -14,6 +14,7 @@ import { colors, radius, spacing, typography } from '../styles/theme';
 import { useProjectPermissions } from '../hooks/useProjectPermissions';
 import { Task } from '../types';
 import { useToast } from '../core/ToastContext';
+import { useWorkspaceScroll } from '../core/WorkspaceScrollContext';
 
 const statusTone = {
   planned: 'default',
@@ -59,6 +60,7 @@ const makeRangeKey = (range: Pick<RangeDraft, 'start_date' | 'end_date'>) =>
 
 export const ScheduleScreen = () => {
   const { showToast } = useToast();
+  const { handleScroll } = useWorkspaceScroll();
   const { selectedProject } = useProjectContext();
   const { canViewSchedule, canEditSchedule } = useProjectPermissions();
   const queryClient = useQueryClient();
@@ -475,7 +477,7 @@ export const ScheduleScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} onScroll={handleScroll} scrollEventThrottle={16}>
       <SectionHeader title="Schedule" subtitle="Plan and track your timeline." />
       {!canViewSchedule ? (
         <EmptyState title="View-only access" description="You do not have access to view the schedule." />
@@ -620,16 +622,17 @@ export const ScheduleScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: spacing.lg,
-    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: 'transparent',
   },
   content: {
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   cardTitle: {
     fontSize: typography.h2,
     fontWeight: '600',
     marginBottom: spacing.sm,
+    color: colors.text,
   },
   statusRow: {
     flexDirection: 'row',
@@ -648,10 +651,10 @@ const styles = StyleSheet.create({
   dateControl: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceMuted,
   },
   dateControlError: {
     borderColor: colors.danger,
@@ -713,7 +716,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   ganttWrapper: {
-    borderRadius: 16,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -727,7 +730,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.surfaceMuted,
   },
   ganttHeaderCell: {
     alignItems: 'center',
