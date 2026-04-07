@@ -214,8 +214,10 @@ export const ProjectWorkspace = () => {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <View style={[styles.backgroundOrb, styles.backgroundOrbLeft]} />
-      <View style={[styles.backgroundOrb, styles.backgroundOrbRight]} />
+      <View pointerEvents="none" style={styles.backgroundLayer}>
+        <View style={[styles.backgroundOrb, styles.backgroundOrbLeft]} />
+        <View style={[styles.backgroundOrb, styles.backgroundOrbRight]} />
+      </View>
       <View
         style={[
           styles.shell,
@@ -367,6 +369,10 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  backgroundLayer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
   },
   backgroundOrb: {
     position: 'absolute',
