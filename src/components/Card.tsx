@@ -19,6 +19,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.md,
+    width: '100%',
+    alignSelf: 'stretch',
+    minWidth: 0,
     ...(Platform.OS === 'web'
       ? {
           boxShadow: '0px 10px 16px rgba(91, 107, 99, 0.08)',

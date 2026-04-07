@@ -60,6 +60,8 @@ export const Input = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: spacing.md,
+    width: '100%',
+    minWidth: 0,
   },
   label: {
     fontSize: typography.small,
@@ -77,6 +79,9 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     color: colors.text,
     backgroundColor: colors.surfaceMuted,
+    width: '100%',
+    minWidth: 0,
+    maxWidth: '100%',
   },
   multiline: {
     minHeight: 110,

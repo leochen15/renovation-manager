@@ -51,7 +51,7 @@ export const ProjectWorkspace = () => {
   } = useProjectPermissions();
 
   const isWideLayout = width >= 960;
-  const isCollapsibleMobileHero = Platform.OS === 'ios' && !isWideLayout;
+  const isCollapsibleMobileHero = !isWideLayout && (Platform.OS === 'ios' || Platform.OS === 'web');
   const projectId = selectedProject?.id ?? null;
   const today = new Date().toISOString().slice(0, 10);
 
